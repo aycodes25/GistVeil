@@ -1,4 +1,5 @@
 import 'server-only';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient } from './client';
 import type { AdminStats, BanRow, ContentFilters, ContentRow, ReportItem } from './types';
 import { PAGE_SIZE, escapeLike } from './validate';
@@ -242,4 +243,68 @@ export async function fetchStats(days: number = 30): Promise<AdminStats> {
   const { data, error } = await db.rpc('admin_stats', { p_days: days });
   if (error) throw new Error(`Loading stats failed: ${error.message}`);
   return data as AdminStats;
+}
+
+// Current announcement text ("" when none) and the blocked-words list, for the settings page.
+export async function fetchSettings(): Promise<{ announcement: string; blockedWords: string[] }> {
+  const db = await getAdminClient();
+  const [announcement, words] = await Promise.all([
+    db.from('settings').select('value').eq('key', 'announcement').maybeSingle(),
+    db.from('blocked_words').select('word').order('word', { ascending: true }),
+  ]);
+
+  if (announcement.error) throw new Error(`Loading the announcement failed: ${announcement.error.message}`);
+  if (words.error) throw new Error(`Loading blocked words failed: ${words.error.message}`);
+
+  return {
+    announcement: (announcement.data?.value as string | undefined) ?? '',
+    blockedWords: (words.data ?? []).map((row) => String(row.word)),
+  };
+}
+
+// ---- Data export -------------------------------------------------------------------------
+
+export const EXPORT_PAGE_SIZE = 1000; // matches the API's default 1000-row response cap
+
+// The columns of each export, in order. `device_token` is deliberately absent: it is the
+// closest thing to a stable per-person identifier the database holds, and nobody needs it in
+// a file that is easy to leak. `author` is the anonymous display name.
+export const EXPORT_COLUMNS = {
+  posts: ['id', 'created_at', 'category', 'body', 'report_count', 'hidden', 'pinned_at', 'anon_user_id', 'author'],
+  advices: ['id', 'post_id', 'created_at', 'body', 'upvotes', 'report_count', 'hidden', 'anon_user_id', 'author'],
+} as const;
+
+export type ExportKind = keyof typeof EXPORT_COLUMNS;
+export type ExportRow = Record<string, string | number | boolean | null>;
+
+// One page of an export, oldest first. The caller passes the client (obtained once, via
+// getAdminClient(), before streaming starts) because request-scoped helpers such as cookies()
+// are not reliably available inside a stream callback after the handler has returned.
+export async function fetchExportPage(
+  db: SupabaseClient,
+  kind: ExportKind,
+  offset: number,
+): Promise<ExportRow[]> {
+  const columns =
+    kind === 'posts'
+      ? 'id, created_at, category, body, report_count, hidden, pinned_at, anon_user_id, anon_users(anon_name)'
+      : 'id, post_id, created_at, body, upvotes, report_count, hidden, anon_user_id, anon_users(anon_name)';
+
+  const { data, error } = await db
+    .from(kind)
+    .select(columns)
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+    .range(offset, offset + EXPORT_PAGE_SIZE - 1);
+
+  if (error) {
+    // 416 / PGRST103: the offset is past the last row. This happens when the total is an
+    // exact multiple of the page size, and it just means "no more rows".
+    if (error.code === 'PGRST103') return [];
+    throw new Error(`Loading export data failed: ${error.message}`);
+  }
+
+  return ((data ?? []) as unknown as Array<Record<string, unknown> & { anon_users: AuthorEmbed }>).map(
+    ({ anon_users, ...row }) => ({ ...row, author: authorName(anon_users) }) as ExportRow,
+  );
 }

@@ -17,6 +17,6 @@ export function csvCell(value: unknown): string {
 }
 
 // Cells joined by commas, without a line ending; the caller chooses the newline.
-export function csvRow(values: unknown[]): string {
+export function csvRow(values: readonly unknown[]): string {
   return values.map(csvCell).join(',');
 }

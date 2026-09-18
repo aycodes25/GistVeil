@@ -81,3 +81,10 @@ export interface AdminStats {
   by_category: { category: Category; count: number }[];
   daily: DailyPoint[];
 }
+
+/** State returned by the settings forms (used with useActionState). */
+export interface SettingsFormState {
+  ok?: boolean;
+  message?: string;
+  error?: string;
+}
