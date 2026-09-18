@@ -16,7 +16,7 @@ until V1 has real posts from real users.
 
 ## Architecture
 
-- **Frontend:** Next.js (App Router), deployed to Vercel free tier.
+- **Frontend:** Next.js (App Router), TailwindCss, deployed to Vercel free tier.
 - **Backend/DB:** Supabase (Postgres), accessed directly from the Next.js
   client via the Supabase JS client — no custom API server needed for V1.
 - **Hosting cost:** $0/month at V1 scale (both Vercel and Supabase free
