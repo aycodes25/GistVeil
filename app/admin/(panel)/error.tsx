@@ -18,8 +18,8 @@ export default function PanelError({
       <h2 className="mb-1 text-lg font-semibold text-white">Something went wrong</h2>
       <p className="mb-3 text-sm text-neutral-400">
         This page couldn&apos;t load. Check the server logs
-        {error.digest ? ` (reference ${error.digest})` : ''} — a missing
-        SUPABASE_SERVICE_ROLE_KEY or an un-run admin.sql are the usual causes.
+        {error.digest ? ` (reference ${error.digest})` : ''} — the usual causes are a missing
+        service-role key in the server&apos;s environment, or supabase/admin.sql not having been run.
       </p>
       <button
         type="button"
