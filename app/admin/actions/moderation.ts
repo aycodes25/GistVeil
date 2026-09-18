@@ -93,3 +93,29 @@ export async function banAuthor(
   if (error) return failed('ban author', error);
   return succeeded();
 }
+
+// Pinned posts sort first in the public feed.
+export async function setPinned(id: string, pinned: boolean): Promise<ActionResult> {
+  const db = await getAdminClient();
+  if (!isUuid(id) || typeof pinned !== 'boolean') return { ok: false, error: INVALID };
+
+  const { error } = await db
+    .from('posts')
+    .update({ pinned_at: pinned ? new Date().toISOString() : null })
+    .eq('id', id);
+  if (error) return failed('set pinned', error);
+  return succeeded();
+}
+
+// Lifts the ban only. Content that was hidden along with the ban stays hidden; unhide it
+// from the content browser if it should come back.
+export async function unbanDevice(deviceToken: string): Promise<ActionResult> {
+  const db = await getAdminClient();
+  if (typeof deviceToken !== 'string' || deviceToken.length === 0 || deviceToken.length > 200) {
+    return { ok: false, error: INVALID };
+  }
+
+  const { error } = await db.from('banned_devices').delete().eq('device_token', deviceToken);
+  if (error) return failed('unban device', error);
+  return succeeded();
+}
