@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { getOrCreateAnonIdentity } from '@/lib/anonIdentity';
 import { hasVoted, markVoted } from '@/lib/localActions';
@@ -13,8 +13,14 @@ export function UpvoteButton({
   initialUpvotes: number;
 }) {
   const [upvotes, setUpvotes] = useState(initialUpvotes);
-  const [voted, setVoted] = useState(() => hasVoted(adviceId));
+  const [voted, setVoted] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (hasVoted(adviceId)) {
+      setVoted(true);
+    }
+  }, [adviceId]);
 
   async function handleClick() {
     if (voted || busy) return;

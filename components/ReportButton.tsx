@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { getOrCreateAnonIdentity } from '@/lib/anonIdentity';
 import { hasReported, markReported } from '@/lib/localActions';
@@ -12,8 +12,14 @@ export function ReportButton({
   targetType: 'post' | 'advice';
   targetId: string;
 }) {
-  const [reported, setReported] = useState(() => hasReported(targetId));
+  const [reported, setReported] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (hasReported(targetId)) {
+      setReported(true);
+    }
+  }, [targetId]);
 
   async function handleClick() {
     if (reported || busy) return;
