@@ -1,6 +1,6 @@
 import 'server-only';
 import { getAdminClient } from './client';
-import type { BanRow, ContentFilters, ContentRow, ReportItem } from './types';
+import type { AdminStats, BanRow, ContentFilters, ContentRow, ReportItem } from './types';
 import { PAGE_SIZE, escapeLike } from './validate';
 import type { Category } from '../types';
 
@@ -233,4 +233,13 @@ export async function fetchBans(): Promise<BanRow[]> {
     postCount: Number(row.post_count),
     adviceCount: Number(row.advice_count),
   }));
+}
+
+// Everything the dashboard shows, in one round trip. Computed in SQL (admin_stats) because
+// the Supabase API caps responses at 1000 rows, which would make counting in JS undercount.
+export async function fetchStats(days: number = 30): Promise<AdminStats> {
+  const db = await getAdminClient();
+  const { data, error } = await db.rpc('admin_stats', { p_days: days });
+  if (error) throw new Error(`Loading stats failed: ${error.message}`);
+  return data as AdminStats;
 }

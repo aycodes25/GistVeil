@@ -58,3 +58,26 @@ export interface ReportItem {
   /** The thread this item belongs to: the post's own id, or an advice's parent post. */
   postId: string;
 }
+
+export interface DailyPoint {
+  /** Calendar day, "YYYY-MM-DD" (UTC). */
+  day: string;
+  posts: number;
+  advices: number;
+  new_users: number;
+}
+
+/** The JSON document returned by the admin_stats() SQL function. */
+export interface AdminStats {
+  totals: {
+    posts: number;
+    advices: number;
+    anon_users: number;
+    hidden_posts: number;
+    hidden_advices: number;
+    banned_devices: number;
+    open_reports: number;
+  };
+  by_category: { category: Category; count: number }[];
+  daily: DailyPoint[];
+}

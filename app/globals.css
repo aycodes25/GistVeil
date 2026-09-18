@@ -21,3 +21,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Dashboard charts. The admin UI is dark-only, so there is a single set of tokens. The three
+   series colours were validated with the dataviz palette validator against the #171717 card
+   surface (worst adjacent colour-blind separation dE 9.4, normal-vision 26.5, all >= 3:1). */
+.viz-root {
+  --viz-surface: #171717;
+  --viz-ink: #f5f5f5;
+  --viz-ink-secondary: #c3c2b7;
+  --viz-ink-muted: #898781;
+  --viz-grid: #2c2c2a;
+  --viz-axis: #383835;
+  --viz-series-1: #3987e5;
+  --viz-series-2: #d95926;
+  --viz-series-3: #199e70;
+}

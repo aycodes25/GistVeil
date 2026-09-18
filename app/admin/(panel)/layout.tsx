@@ -17,7 +17,11 @@ export default async function PanelLayout({ children }: { children: React.ReactN
     <div className="mx-auto max-w-5xl px-4 py-6">
       <header className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-neutral-800 pb-4">
         <span className="text-lg font-bold text-white">GistVeil Admin</span>
-        <nav aria-label="Admin" className="flex flex-wrap items-center gap-1">
+        {/* On phones the nav takes its own full-width row (order-last) so "Sign out" stays on the title row. */}
+        <nav
+          aria-label="Admin"
+          className="order-last flex w-full flex-wrap items-center gap-1 sm:order-none sm:w-auto"
+        >
           <NavLink href="/admin" exact>
             Dashboard
           </NavLink>
