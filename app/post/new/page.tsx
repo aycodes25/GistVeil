@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getOrCreateAnonIdentity } from '@/lib/anonIdentity';
 import { checkSafety } from '@/lib/safetyFilter';
+import { fetchBlockedWords } from '@/lib/blockedWords';
 import { CATEGORIES } from '@/lib/categories';
 import type { Category } from '@/lib/types';
 
@@ -28,14 +29,16 @@ export default function NewPostPage() {
       return;
     }
 
-    const safety = checkSafety(body);
-    if (!safety.ok) {
-      setError(safety.reason ?? 'This post cannot be published.');
-      return;
-    }
-
+    // Submitting is set before the first await so a double-click can't submit twice while
+    // the blocked-words list loads.
     setSubmitting(true);
     try {
+      const safety = checkSafety(body, await fetchBlockedWords());
+      if (!safety.ok) {
+        setError(safety.reason ?? 'This post cannot be published.');
+        return;
+      }
+
       const identity = await getOrCreateAnonIdentity();
       const { data, error: insertError } = await supabase
         .from('posts')

@@ -12,14 +12,18 @@ export interface SafetyResult {
   reason?: string;
 }
 
-export function checkSafety(text: string): SafetyResult {
+// `extraWords` are additional blocked words managed in the admin (see lib/blockedWords.ts).
+// They are matched exactly like the built-in list. Blank entries are skipped: an empty
+// string is a substring of everything and would otherwise block every post.
+export function checkSafety(text: string, extraWords: readonly string[] = []): SafetyResult {
   if (PHONE_PATTERN.test(text)) {
     return { ok: false, reason: 'Please remove phone numbers from your post.' };
   }
 
   const lower = text.toLowerCase();
-  for (const word of BLOCKED_WORDS) {
-    if (lower.includes(word)) {
+  for (const raw of [...BLOCKED_WORDS, ...extraWords]) {
+    const word = raw.trim().toLowerCase();
+    if (word && lower.includes(word)) {
       return { ok: false, reason: 'Please remove offensive language from your post.' };
     }
   }

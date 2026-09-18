@@ -13,6 +13,9 @@ export function PostCard({ post }: { post: Post }) {
       className="block rounded-lg border border-neutral-800 bg-neutral-900 p-4 hover:border-purple-600"
     >
       <div className="mb-2 flex items-center gap-2 text-xs text-neutral-400">
+        {post.pinned_at && (
+          <span className="rounded bg-purple-950 px-2 py-0.5 font-medium text-purple-300">Pinned</span>
+        )}
         <span>{post.anon_users?.anon_name ?? 'Anon'}</span>
         <span>·</span>
         <span>{timeAgo(post.created_at)}</span>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { getOrCreateAnonIdentity } from '@/lib/anonIdentity';
 import { checkSafety } from '@/lib/safetyFilter';
+import { fetchBlockedWords } from '@/lib/blockedWords';
 
 export function AddAdviceForm({ postId }: { postId: string }) {
   const router = useRouter();
@@ -21,14 +22,16 @@ export function AddAdviceForm({ postId }: { postId: string }) {
       return;
     }
 
-    const safety = checkSafety(body);
-    if (!safety.ok) {
-      setError(safety.reason ?? 'This reply cannot be published.');
-      return;
-    }
-
+    // Submitting is set before the first await so a double-click can't submit twice while
+    // the blocked-words list loads.
     setSubmitting(true);
     try {
+      const safety = checkSafety(body, await fetchBlockedWords());
+      if (!safety.ok) {
+        setError(safety.reason ?? 'This reply cannot be published.');
+        return;
+      }
+
       const identity = await getOrCreateAnonIdentity();
       const { error: insertError } = await supabase.from('advices').insert({
         post_id: postId,
