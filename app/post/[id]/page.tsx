@@ -4,6 +4,7 @@ import { categoryLabel } from '@/lib/categories';
 import { timeAgo } from '@/lib/time';
 import { AdviceItem } from '@/components/AdviceItem';
 import { AddAdviceForm } from '@/components/AddAdviceForm';
+import { ReportButton } from '@/components/ReportButton';
 import type { Advice, Post } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -49,6 +50,9 @@ export default async function PostDetailPage({
           </span>
         </div>
         <p className="text-neutral-100">{post.body}</p>
+        <div className="mt-2">
+          <ReportButton targetType="post" targetId={post.id} />
+        </div>
       </div>
 
       <h2 className="mt-6 mb-2 text-lg font-semibold text-white">

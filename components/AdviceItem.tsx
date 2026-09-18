@@ -1,4 +1,6 @@
 import { timeAgo } from '@/lib/time';
+import { UpvoteButton } from './UpvoteButton';
+import { ReportButton } from './ReportButton';
 import type { Advice } from '@/lib/types';
 
 export function AdviceItem({ advice }: { advice: Advice }) {
@@ -10,6 +12,10 @@ export function AdviceItem({ advice }: { advice: Advice }) {
         <span>{timeAgo(advice.created_at)}</span>
       </div>
       <p className="text-neutral-100">{advice.body}</p>
+      <div className="mt-2 flex items-center gap-4">
+        <UpvoteButton adviceId={advice.id} initialUpvotes={advice.upvotes} />
+        <ReportButton targetType="advice" targetId={advice.id} />
+      </div>
     </div>
   );
 }
