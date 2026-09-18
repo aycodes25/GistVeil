@@ -19,6 +19,8 @@ export interface Post {
   body: string;
   report_count: number;
   created_at: string;
+  /** Set when an admin pinned the post; absent until the admin migration has run. */
+  pinned_at?: string | null;
   anon_users?: { anon_name: string };
   advice_count?: number;
 }
