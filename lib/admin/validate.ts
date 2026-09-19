@@ -1,7 +1,10 @@
 // Pure input validation and normalisation for admin actions and pages. Server Action
 // arguments come from the client, so every id and enum is re-checked here.
 
+import { isBannerTheme, type BannerTheme } from '../announcement';
+
 export const ANNOUNCEMENT_MAX = 280;
+export const BANNER_TITLE_MAX = 80;
 export const WORD_MAX = 60;
 export const PAGE_SIZE = 25;
 
@@ -49,6 +52,25 @@ export function normalizeAnnouncement(
     return { ok: false, error: `Keep the announcement under ${ANNOUNCEMENT_MAX} characters.` };
   }
   return { ok: true, value };
+}
+
+// The whole banner as submitted by the settings form. An empty message means "remove the banner".
+export function normalizeBanner(input: {
+  message: string;
+  title: string;
+  theme: string;
+  active: string;
+}): { ok: true; value: { message: string; title: string; theme: BannerTheme; active: boolean } } | { ok: false; error: string } {
+  const message = input.message.trim();
+  const title = input.title.trim();
+  if (message.length > ANNOUNCEMENT_MAX) {
+    return { ok: false, error: `Keep the message under ${ANNOUNCEMENT_MAX} characters.` };
+  }
+  if (title.length > BANNER_TITLE_MAX) {
+    return { ok: false, error: `Keep the title under ${BANNER_TITLE_MAX} characters.` };
+  }
+  if (!isBannerTheme(input.theme)) return { ok: false, error: 'Pick a theme.' };
+  return { ok: true, value: { message, title, theme: input.theme, active: input.active === 'true' } };
 }
 
 // Page numbers come from the URL: anything that is not a positive integer becomes page 1.

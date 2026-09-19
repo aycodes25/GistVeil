@@ -93,3 +93,8 @@ export function avatarTone(seed: string): number {
 export function longDate(date: Date): string {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
+
+// Today's date, in the same form. Lives here so a component can show it without calling the clock itself.
+export function todayLongDate(): string {
+  return longDate(new Date());
+}

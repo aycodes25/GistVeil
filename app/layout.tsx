@@ -19,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${outfit.variable} ${jakarta.variable}`}>
-      <body className="min-h-screen bg-black">{children}</body>
+      <body className="min-h-screen">{children}</body>
     </html>
   );
 }

@@ -1,17 +1,14 @@
 @import "tailwindcss";
 
-/* The whole UI is designed dark-only (black page, neutral-900 cards, white headings). The
-   scaffold's light/dark switch put a WHITE body behind those white headings for visitors whose
-   browser is in light mode, and its unlayered `body` rule beat Tailwind's layered `bg-black`. */
+/* The UI is light-only, whatever the visitor's browser prefers. These colour the <body> behind the
+   shells (visible when a page is short or on overscroll); they match --color-page and --color-ink. */
 :root {
-  --background: #000000;
-  --foreground: #ededed;
-  color-scheme: dark; /* dark scrollbars and native controls (select, checkbox) too */
+  --background: #f6f6f9;
+  --foreground: #1f1f24;
+  color-scheme: light; /* light scrollbars and native controls (select, checkbox) too */
 }
 
-/* ---- Redesign tokens (measured from the Visily mockups) -------------------------------------
-   The light theme belongs to the shells (PublicShell / AdminShell), not to <body>, so pages
-   migrate one at a time and unconverted pages keep working on the old dark background. */
+/* ---- Design tokens (measured from the Visily mockups) ---------------------------------------- */
 @theme {
   --color-page: #f6f6f9;          /* page, top bar, and card fill: cards are page-coloured */
   --color-sidebar: #e5e5e8;
@@ -69,28 +66,24 @@
   --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
-
 /* No font-family here: the theme's font-sans (Plus Jakarta Sans) is Tailwind's default. */
 body {
   background: var(--background);
   color: var(--foreground);
 }
 
-/* Dashboard charts. The admin UI is dark-only, so there is a single set of tokens. The three
-   series colours were validated with the dataviz palette validator against the #171717 card
-   surface (worst adjacent colour-blind separation dE 9.4, normal-vision 26.5, all >= 3:1). */
+/* Dashboard charts (light). The three series colours are the mockup's purple, teal and red, checked
+   with the dataviz palette validator against the page surface #f6f6f9: lightness band, chroma and
+   colour-blind separation (worst adjacent dE 11.7) all pass. The one warning, teal and red under 3:1
+   against the surface, is what the chart's legend, tooltip and "View as table" are there to cover. */
 .viz-root {
-  --viz-surface: #171717;
-  --viz-ink: #f5f5f5;
-  --viz-ink-secondary: #c3c2b7;
-  --viz-ink-muted: #898781;
-  --viz-grid: #2c2c2a;
-  --viz-axis: #383835;
-  --viz-series-1: #3987e5;
-  --viz-series-2: #d95926;
-  --viz-series-3: #199e70;
+  --viz-surface: #f6f6f9;
+  --viz-ink: #1f1f24;
+  --viz-ink-secondary: #4a4a4f;
+  --viz-ink-muted: #71717a;
+  --viz-grid: #d9d9de;
+  --viz-axis: #c9c9cf;
+  --viz-series-1: #7c3aed;
+  --viz-series-2: #00a9b3;
+  --viz-series-3: #ed6c6d;
 }

@@ -1,7 +1,8 @@
 import 'server-only';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAdminClient } from './client';
-import type { AdminStats, BanRow, ContentFilters, ContentRow, ReportItem } from './types';
+import { ANNOUNCEMENT_KEYS, parseBanner, type Banner } from '../announcement';
+import type { AdminDashboard, AdminStats, BanRow, ContentFilters, ContentRow, ReportRow } from './types';
 import { PAGE_SIZE, escapeLike } from './validate';
 import type { Category } from '../types';
 
@@ -9,29 +10,7 @@ import type { Category } from '../types';
 // getAdminClient(), which verifies the admin session first. Errors are thrown so the
 // panel's error boundary shows them; the message goes to the server log, not the browser.
 
-export const REPORT_QUEUE_LIMIT = 50;
-
 type AuthorEmbed = { anon_name: string } | { anon_name: string }[] | null;
-
-interface ReportedPostRow {
-  id: string;
-  body: string;
-  category: Category;
-  report_count: number;
-  created_at: string;
-  anon_user_id: string;
-  anon_users: AuthorEmbed;
-}
-
-interface ReportedAdviceRow {
-  id: string;
-  post_id: string;
-  body: string;
-  report_count: number;
-  created_at: string;
-  anon_user_id: string;
-  anon_users: AuthorEmbed;
-}
 
 // PostgREST returns a many-to-one embed as an object; tolerate an array too.
 function authorName(embed: AuthorEmbed): string {
@@ -39,174 +18,59 @@ function authorName(embed: AuthorEmbed): string {
   return author?.anon_name ?? 'Anon';
 }
 
-// Reported, not-hidden posts and advice merged into one list, most-reported first.
-// `total` is the full count of open reports, which can exceed the number shown.
-export async function fetchOpenReports(
-  limit: number = REPORT_QUEUE_LIMIT,
-): Promise<{ items: ReportItem[]; total: number }> {
-  const db = await getAdminClient();
-
-  const [posts, advices] = await Promise.all([
-    db
-      .from('posts')
-      .select('id, body, category, report_count, created_at, anon_user_id, anon_users(anon_name)', {
-        count: 'exact',
-      })
-      .gt('report_count', 0)
-      .eq('hidden', false)
-      .order('report_count', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit),
-    db
-      .from('advices')
-      .select(
-        'id, post_id, body, report_count, created_at, anon_user_id, anon_users(anon_name)',
-        { count: 'exact' },
-      )
-      .gt('report_count', 0)
-      .eq('hidden', false)
-      .order('report_count', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(limit),
-  ]);
-
-  if (posts.error) throw new Error(`Loading reported posts failed: ${posts.error.message}`);
-  if (advices.error) throw new Error(`Loading reported advice failed: ${advices.error.message}`);
-
-  const postItems: ReportItem[] = ((posts.data ?? []) as unknown as ReportedPostRow[]).map((row) => ({
-    type: 'post',
-    id: row.id,
-    body: row.body,
-    reportCount: row.report_count,
-    createdAt: row.created_at,
-    authorId: row.anon_user_id,
-    authorName: authorName(row.anon_users),
-    category: row.category,
-    postId: row.id,
-  }));
-
-  const adviceItems: ReportItem[] = ((advices.data ?? []) as unknown as ReportedAdviceRow[]).map(
-    (row) => ({
-      type: 'advice',
-      id: row.id,
-      body: row.body,
-      reportCount: row.report_count,
-      createdAt: row.created_at,
-      authorId: row.anon_user_id,
-      authorName: authorName(row.anon_users),
-      postId: row.post_id,
-    }),
-  );
-
-  const items = [...postItems, ...adviceItems]
-    .sort((a, b) => b.reportCount - a.reportCount || b.createdAt.localeCompare(a.createdAt))
-    .slice(0, limit);
-
-  return { items, total: (posts.count ?? 0) + (advices.count ?? 0) };
-}
-
-interface ContentPostRow {
-  id: string;
-  body: string;
-  category: Category;
-  report_count: number;
-  hidden: boolean;
-  pinned_at: string | null;
-  created_at: string;
-  anon_user_id: string;
-  anon_users: AuthorEmbed;
-}
-
-interface ContentAdviceRow {
+interface ContentListRow {
+  item_type: 'post' | 'advice';
   id: string;
   post_id: string;
   body: string;
-  upvotes: number;
+  category: Category | null;
+  author_id: string;
+  author_name: string | null;
   report_count: number;
   hidden: boolean;
+  pinned_at: string | null;
+  upvotes: number | null;
   created_at: string;
-  anon_user_id: string;
-  anon_users: AuthorEmbed;
+  total_count: number | string;
 }
 
-// One page of posts or advice for the content browser. `total` is the count of all rows
-// matching the filters, so the page can show how many pages there are.
-export async function fetchContent(
+// One page of posts and/or replies with the filters applied in SQL, plus the total that matches.
+// Backed by admin_content_list(). The total rides on every row, so an empty page carries no total:
+// the caller asks again for page one when it needs to know how many pages exist.
+export async function fetchContentList(
   filters: ContentFilters,
 ): Promise<{ rows: ContentRow[]; total: number }> {
   const db = await getAdminClient();
-  const from = (filters.page - 1) * PAGE_SIZE;
-  const to = from + PAGE_SIZE - 1;
+  const { data, error } = await db.rpc('admin_content_list', {
+    p_kind: filters.kind,
+    // The SQL function matches with ILIKE, so LIKE wildcards in what was typed are escaped here.
+    p_q: filters.q ? escapeLike(filters.q) : null,
+    p_category: filters.category === 'all' ? null : filters.category,
+    p_status: filters.status,
+    p_reported: filters.reportedOnly,
+    p_limit: PAGE_SIZE,
+    p_offset: (filters.page - 1) * PAGE_SIZE,
+  });
+  if (error) throw new Error(`Loading content failed: ${error.message}`);
 
-  const columns =
-    filters.kind === 'posts'
-      ? 'id, body, category, report_count, hidden, pinned_at, created_at, anon_user_id, anon_users(anon_name)'
-      : 'id, post_id, body, upvotes, report_count, hidden, created_at, anon_user_id, anon_users(anon_name)';
-
-  // Built twice when needed: once for the page of rows, and (only if the requested page is
-  // past the end) once as a head-only count to learn the real total.
-  function build(head: boolean) {
-    let request = db
-      .from(filters.kind)
-      .select(head ? 'id' : columns, { count: 'exact', head });
-
-    if (filters.q) request = request.ilike('body', `%${escapeLike(filters.q)}%`);
-    if (filters.kind === 'posts' && filters.category !== 'all') {
-      request = request.eq('category', filters.category);
-    }
-    if (filters.status === 'visible') request = request.eq('hidden', false);
-    if (filters.status === 'hidden') request = request.eq('hidden', true);
-    if (filters.reportedOnly) request = request.gt('report_count', 0);
-    return request;
-  }
-
-  // `id` breaks ties so offset paging stays stable when timestamps collide.
-  const { data, error, count } = await build(false)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: true })
-    .range(from, to);
-
-  if (error) {
-    // PostgREST answers 416 (PGRST103) when the offset is past the last row, e.g. after the
-    // last item on the last page was deleted. That is not a failure: report the true total
-    // with no rows so the page can send the viewer to the last real page.
-    if (error.code === 'PGRST103') {
-      const { count: total, error: countError } = await build(true);
-      if (countError) throw new Error(`Loading content failed: ${countError.message}`);
-      return { rows: [], total: total ?? 0 };
-    }
-    throw new Error(`Loading content failed: ${error.message}`);
-  }
-
-  const rows: ContentRow[] =
-    filters.kind === 'posts'
-      ? ((data ?? []) as unknown as ContentPostRow[]).map((row) => ({
-          type: 'post',
-          id: row.id,
-          body: row.body,
-          createdAt: row.created_at,
-          authorId: row.anon_user_id,
-          authorName: authorName(row.anon_users),
-          reportCount: row.report_count,
-          hidden: row.hidden,
-          postId: row.id,
-          category: row.category,
-          pinnedAt: row.pinned_at,
-        }))
-      : ((data ?? []) as unknown as ContentAdviceRow[]).map((row) => ({
-          type: 'advice',
-          id: row.id,
-          body: row.body,
-          createdAt: row.created_at,
-          authorId: row.anon_user_id,
-          authorName: authorName(row.anon_users),
-          reportCount: row.report_count,
-          hidden: row.hidden,
-          postId: row.post_id,
-          upvotes: row.upvotes,
-        }));
-
-  return { rows, total: count ?? 0 };
+  const rows = (data ?? []) as ContentListRow[];
+  return {
+    rows: rows.map((row) => ({
+      type: row.item_type,
+      id: row.id,
+      body: row.body,
+      createdAt: row.created_at,
+      authorId: row.author_id,
+      authorName: row.author_name ?? 'Anon',
+      reportCount: row.report_count,
+      hidden: row.hidden,
+      postId: row.post_id,
+      category: row.category ?? undefined,
+      pinnedAt: row.pinned_at,
+      upvotes: row.upvotes ?? undefined,
+    })),
+    total: rows.length ? Number(rows[0].total_count) : 0,
+  };
 }
 
 interface BanQueryRow {
@@ -236,8 +100,70 @@ export async function fetchBans(): Promise<BanRow[]> {
   }));
 }
 
-// Everything the dashboard shows, in one round trip. Computed in SQL (admin_stats) because
-// the Supabase API caps responses at 1000 rows, which would make counting in JS undercount.
+// Everything the dashboard's cards and chart need, in one round trip (see admin_dashboard() in
+// supabase/admin.sql). Computed in SQL because the Supabase API caps responses at 1000 rows, which
+// would make counting in JS undercount. Every figure is a count of real rows.
+export async function fetchDashboard(): Promise<AdminDashboard> {
+  const db = await getAdminClient();
+  const { data, error } = await db.rpc('admin_dashboard');
+  if (error || !data) throw new Error(`Loading the dashboard failed: ${error?.message ?? 'no data'}`);
+  return data as AdminDashboard;
+}
+
+interface ReportListRow {
+  item_type: 'post' | 'advice';
+  id: string;
+  post_id: string;
+  body: string;
+  category: Category | null;
+  author_id: string;
+  author_name: string | null;
+  report_count: number;
+  latest_report_at: string;
+  created_at: string;
+  total_count: number | string;
+}
+
+// Open reports, most-reported first (ties: the most recent report first), with the time of each
+// item's latest report and the full count. Backed by admin_reports_list().
+export async function fetchReportsList({
+  type,
+  q,
+  limit = 25,
+  offset = 0,
+}: {
+  type?: 'post' | 'advice';
+  q?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<{ items: ReportRow[]; total: number }> {
+  const db = await getAdminClient();
+  const { data, error } = await db.rpc('admin_reports_list', {
+    p_type: type ?? null,
+    p_q: q?.trim() ? escapeLike(q.trim()) : null,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw new Error(`Loading reports failed: ${error.message}`);
+
+  const rows = (data ?? []) as ReportListRow[];
+  return {
+    items: rows.map((row) => ({
+      type: row.item_type,
+      id: row.id,
+      postId: row.post_id,
+      body: row.body,
+      category: row.category,
+      authorId: row.author_id,
+      authorName: row.author_name ?? 'Anon',
+      reportCount: row.report_count,
+      latestReportAt: row.latest_report_at,
+      createdAt: row.created_at,
+    })),
+    total: rows.length ? Number(rows[0].total_count) : 0,
+  };
+}
+
 export async function fetchStats(days: number = 30): Promise<AdminStats> {
   const db = await getAdminClient();
   const { data, error } = await db.rpc('admin_stats', { p_days: days });
@@ -245,20 +171,24 @@ export async function fetchStats(days: number = 30): Promise<AdminStats> {
   return data as AdminStats;
 }
 
-// Current announcement text ("" when none) and the blocked-words list, for the settings page.
-export async function fetchSettings(): Promise<{ announcement: string; blockedWords: string[] }> {
+// For the settings page: the banner (four settings rows), the blocked words, and how long the
+// database took to answer on this load (the "database connection" figure).
+export async function fetchSettings(): Promise<{ banner: Banner; blockedWords: string[]; dbMs: number }> {
   const db = await getAdminClient();
-  const [announcement, words] = await Promise.all([
-    db.from('settings').select('value').eq('key', 'announcement').maybeSingle(),
+  const started = performance.now();
+  const [settings, words] = await Promise.all([
+    db.from('settings').select('key, value').in('key', [...ANNOUNCEMENT_KEYS]),
     db.from('blocked_words').select('word').order('word', { ascending: true }),
   ]);
+  const dbMs = Math.round(performance.now() - started);
 
-  if (announcement.error) throw new Error(`Loading the announcement failed: ${announcement.error.message}`);
+  if (settings.error) throw new Error(`Loading the announcement failed: ${settings.error.message}`);
   if (words.error) throw new Error(`Loading blocked words failed: ${words.error.message}`);
 
   return {
-    announcement: (announcement.data?.value as string | undefined) ?? '',
+    banner: parseBanner((settings.data ?? []) as { key: string; value: string }[]),
     blockedWords: (words.data ?? []).map((row) => String(row.word)),
+    dbMs,
   };
 }
 

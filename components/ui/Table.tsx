@@ -2,10 +2,12 @@ import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 
 // Table parts styled like the mockups: a sunken uppercase header band and hairline row rules.
-// TableWrap lets a wide table scroll inside its card instead of breaking the page.
+// TableWrap lets a wide table scroll inside its card instead of breaking the page. It is `relative`
+// so absolutely positioned descendants (the `sr-only` header labels) are clipped with the table
+// rather than escaping to the page and widening it.
 
 export function TableWrap({ className, ...props }: ComponentProps<'div'>) {
-  return <div className={cn('overflow-x-auto', className)} {...props} />;
+  return <div className={cn('relative overflow-x-auto', className)} {...props} />;
 }
 
 export function Table({ className, ...props }: ComponentProps<'table'>) {

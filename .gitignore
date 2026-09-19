@@ -42,3 +42,6 @@ next-env.d.ts
 
 # generated brand explorations (large, not part of the site)
 /design/brand-explorations/
+
+# Playwright MCP browser-test output (screenshots, logs, saved sessions)
+/.playwright-mcp/

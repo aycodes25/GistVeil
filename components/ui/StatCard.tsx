@@ -12,6 +12,7 @@ export function StatCard({
   icon,
   delta,
   deltaCaption = 'vs last week',
+  lessIsBetter = false,
   note,
   className,
 }: {
@@ -20,6 +21,8 @@ export function StatCard({
   icon: ReactNode;
   delta?: WeekDelta;
   deltaCaption?: string;
+  /** For measures where a fall is good news (reports, failed sign-ins): the colours swap. */
+  lessIsBetter?: boolean;
   note?: ReactNode;
   className?: string;
 }) {
@@ -33,8 +36,8 @@ export function StatCard({
             <span
               className={cn(
                 'inline-flex items-center gap-0.5 font-semibold',
-                delta.direction === 'up' && 'text-emerald-600',
-                delta.direction === 'down' && 'text-red-500',
+                delta.direction === 'up' && (lessIsBetter ? 'text-red-500' : 'text-emerald-600'),
+                delta.direction === 'down' && (lessIsBetter ? 'text-emerald-600' : 'text-red-500'),
                 (delta.direction === 'flat' || delta.direction === 'new') && 'text-muted',
               )}
             >
