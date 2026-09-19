@@ -87,7 +87,7 @@ export function Sidebar({
   return (
     <div className="flex h-full flex-col px-4 pt-[39px] pb-5">
       <Link href="/" onClick={() => setOpen(false)} aria-label="GistVeil home" className="block px-1">
-        <Logo height={36} priority />
+        <Logo height={36} eager />
       </Link>
 
       <nav aria-label={variant === 'admin' ? 'Community and admin' : 'Community'} className="mt-[29px] flex-1 overflow-y-auto">

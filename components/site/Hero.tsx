@@ -38,7 +38,7 @@ export function Hero() {
           src={heroImage}
           alt=""
           fill
-          priority
+          loading="eager"
           sizes="(min-width: 1024px) calc(100vw - 256px), 100vw"
           className="object-cover object-center"
         />

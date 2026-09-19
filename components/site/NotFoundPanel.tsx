@@ -34,6 +34,7 @@ export function NotFoundPanel({
             src={doorImage}
             alt="A curtain drifting in front of an old wooden door"
             fill
+            loading="eager"
             sizes="(min-width: 1024px) 400px, 90vw"
             className="object-cover"
           />

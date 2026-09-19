@@ -8,19 +8,26 @@ import markLogo from '@/public/images/logo-mark.png';
 // The files are imported rather than referenced by URL: Next then fingerprints them, so a
 // replaced logo is picked up at once instead of a cached copy of the old one being served.
 //
-// `height` is the rendered height in pixels; the width follows the image's aspect ratio.
+// `height` is the rendered height in pixels; the width follows the image's aspect ratio. `eager`
+// skips lazy loading, for a logo that is on screen at first paint.
 export function Logo({
   height = 40,
   mark = false,
-  priority,
+  eager = false,
   className,
 }: {
   height?: number;
   mark?: boolean;
-  priority?: boolean;
+  eager?: boolean;
   className?: string;
 }) {
   return (
-    <Image src={mark ? markLogo : fullLogo} alt="GistVeil" height={height} priority={priority} className={className} />
+    <Image
+      src={mark ? markLogo : fullLogo}
+      alt="GistVeil"
+      height={height}
+      loading={eager ? 'eager' : undefined}
+      className={className}
+    />
   );
 }

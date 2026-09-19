@@ -13,7 +13,7 @@ export default function AdminLoginPage() {
       <div className="w-full max-w-[448px]">
         <header className="flex flex-col items-center text-center">
           <div className="flex items-center gap-3">
-            <Logo height={56} priority />
+            <Logo height={56} eager />
             <span className="font-heading text-[32px] leading-10 font-semibold tracking-[-0.01em] text-white">Admin</span>
           </div>
           <p className="mt-2 text-base text-white">Secure Control Room Access</p>
