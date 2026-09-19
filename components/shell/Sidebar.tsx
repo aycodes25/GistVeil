@@ -85,12 +85,12 @@ export function Sidebar({
   };
 
   return (
-    <div className="flex h-full flex-col px-4 pt-[42px] pb-5">
+    <div className="flex h-full flex-col px-4 pt-[39px] pb-5">
       <Link href="/" onClick={() => setOpen(false)} aria-label="GistVeil home" className="block px-1">
-        <Logo height={30} priority />
+        <Logo height={36} priority />
       </Link>
 
-      <nav aria-label={variant === 'admin' ? 'Community and admin' : 'Community'} className="mt-8 flex-1 overflow-y-auto">
+      <nav aria-label={variant === 'admin' ? 'Community and admin' : 'Community'} className="mt-[29px] flex-1 overflow-y-auto">
         <SectionLabel>Community</SectionLabel>
         <ul className="mt-2 space-y-1">{community.map(renderItem)}</ul>
         {variant === 'admin' && (

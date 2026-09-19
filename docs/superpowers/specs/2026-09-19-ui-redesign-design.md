@@ -42,9 +42,15 @@ achievable and would not be meaningful. The commitment is:
 Two things exist only inside the mockup images and cannot be reproduced exactly: the **avatar
 photos** and the **Settings banner art**. Avatars become a generated abstract avatar (deterministic
 from the anon name). The banner is cropped from the mockup or recreated in CSS; either is lower
-quality than a supplied original, and the owner can drop in a better file later. Also, the logo's
-"VEIL" is white with an outline, so it is nearly invisible on the light sidebar, exactly as in the
-mockups. It is matched, and flagged, not "fixed".
+quality than a supplied original, and the owner can drop in a better file later.
+
+**The logo is the owner's redesign, not the mockups' one.** The mockups carry the earlier logo,
+whose "VEIL" is white with an outline and nearly invisible on the light sidebar. During the build
+the owner supplied a new logo (a purple hooded mark, "Gist" in purple and "Veil" in dark navy, with
+the tagline "Real problems. Anonymous advice."). It replaces the old one everywhere and reads well on
+the light sidebar, so nothing needs flagging. It is shown a little larger than the mockup's (36px
+tall, not 30px) because it now has a wordmark worth reading; the navigation below it stays where
+the mockups put it.
 
 ## Foundations
 
@@ -83,9 +89,16 @@ the same visual system but is not in the mockups.
 
 ### Assets
 
-Used: `GISTVEIL-LOGO.png` (sidebar, login), `privacy.png` (feed hero), `doorpurple.png` (404),
+Used: the logo (sidebar, login), `privacy.png` (feed hero), `doorpurple.png` (404),
 `imagepeople.png` (New Post panel). They move to `public/images/` and are rendered with
-`next/image`.
+`next/image`, **imported rather than referenced by URL**: Next fingerprints an imported file, so a
+replaced image is picked up at once. (A URL-referenced image is cached by URL for hours, with no way
+to invalidate it, which is how a swapped logo kept showing its old version.)
+
+The logo lives in three forms. `design/brand/logo-source.png` is the owner's original, never
+modified. `public/images/logo.png` and `logo-mark.png` (the hooded mark alone) are that file trimmed
+to its content. `app/favicon.ico`, `app/icon.png` and `app/apple-icon.png` are generated from the
+mark. To change the logo, replace the source and regenerate the others.
 
 Not served any more, because everything in `public/` is public: the mockup folder, the strip
 screenshot and the six generated `magnific_…` explorations move to `design/`.
