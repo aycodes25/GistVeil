@@ -72,10 +72,12 @@ drop policy if exists "anon select blocked_words" on blocked_words;
 create policy "anon select blocked_words" on blocked_words
   for select to anon using (true);
 
--- Only the announcement key is public; any future setting stays private by default.
+-- Only the announcement's keys are public (text, title, colour theme, on/off switch); any other
+-- setting stays private by default.
 drop policy if exists "anon select announcement" on settings;
 create policy "anon select announcement" on settings
-  for select to anon using (key = 'announcement');
+  for select to anon
+  using (key in ('announcement', 'announcement_title', 'announcement_theme', 'announcement_active'));
 
 -- 3. Hidden content is invisible to the public --------------------------------
 
@@ -307,6 +309,239 @@ grant execute on function admin_delete_content(text, uuid) to service_role;
 grant execute on function admin_ban_author(uuid, text, boolean) to service_role;
 grant execute on function admin_bans() to service_role;
 grant execute on function admin_stats(int) to service_role;
+
+-- 7. Redesign additions ------------------------------------------------------------------------
+-- Data for the redesigned screens. Everything here is read-only except the policy widening.
+
+-- Visible posts per category over the last p_days, most active first. SECURITY INVOKER, so RLS
+-- applies: hidden posts are never counted. Public (feed side card).
+create or replace function popular_categories(p_days int default 7)
+returns table (category text, n bigint)
+language sql
+stable
+set search_path = public
+as $$
+  select p.category, count(*)::bigint as n
+  from posts p
+  where p.created_at >= now() - make_interval(days => greatest(coalesce(p_days, 7), 1))
+  group by p.category
+  order by n desc, p.category
+  limit 6;
+$$;
+
+revoke all on function popular_categories(int) from public;
+grant execute on function popular_categories(int) to anon, authenticated, service_role;
+
+-- Open reports (reported, not hidden), posts and advice together, most-reported first. p_q is a
+-- LIKE pattern body already escaped by the caller; it matches the text or the author's name.
+create or replace function admin_reports_list(
+  p_type text default null,
+  p_q text default null,
+  p_limit int default 25,
+  p_offset int default 0
+)
+returns table (
+  item_type text,
+  id uuid,
+  post_id uuid,
+  body text,
+  category text,
+  author_id uuid,
+  author_name text,
+  report_count int,
+  latest_report_at timestamptz,
+  created_at timestamptz,
+  total_count bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  with items as (
+    select 'post'::text as item_type, p.id, p.id as post_id, p.body, p.category,
+           p.anon_user_id as author_id, u.anon_name as author_name, p.report_count, p.created_at,
+           (select max(r.created_at) from reports r
+             where r.target_type = 'post' and r.target_id = p.id) as latest_report_at
+    from posts p
+    join anon_users u on u.id = p.anon_user_id
+    where p.report_count > 0 and not p.hidden
+    union all
+    select 'advice', a.id, a.post_id, a.body, null::text,
+           a.anon_user_id, u.anon_name, a.report_count, a.created_at,
+           (select max(r.created_at) from reports r
+             where r.target_type = 'advice' and r.target_id = a.id)
+    from advices a
+    join anon_users u on u.id = a.anon_user_id
+    where a.report_count > 0 and not a.hidden
+  ),
+  filtered as (
+    select * from items i
+    where (p_type is null or i.item_type = p_type)
+      and (coalesce(p_q, '') = ''
+           or i.body ilike '%' || p_q || '%'
+           or i.author_name ilike '%' || p_q || '%')
+  )
+  select f.item_type, f.id, f.post_id, f.body, f.category, f.author_id, f.author_name,
+         f.report_count, f.latest_report_at, f.created_at,
+         count(*) over () as total_count
+  from filtered f
+  order by f.report_count desc, f.latest_report_at desc nulls last, f.created_at desc, f.id
+  limit greatest(least(coalesce(p_limit, 25), 100), 1)
+  offset greatest(coalesce(p_offset, 0), 0);
+$$;
+
+-- Every post and advice in one list. p_kind: all | posts | advices. p_status: all | visible |
+-- hidden | flagged (reported and not hidden). A category filter applies to posts only, so it also
+-- leaves replies out. p_q matches the text or the author's name (escaped by the caller).
+create or replace function admin_content_list(
+  p_kind text default 'all',
+  p_q text default null,
+  p_category text default null,
+  p_status text default 'all',
+  p_reported boolean default false,
+  p_limit int default 25,
+  p_offset int default 0
+)
+returns table (
+  item_type text,
+  id uuid,
+  post_id uuid,
+  body text,
+  category text,
+  author_id uuid,
+  author_name text,
+  report_count int,
+  hidden boolean,
+  pinned_at timestamptz,
+  upvotes int,
+  created_at timestamptz,
+  total_count bigint
+)
+language sql
+stable
+set search_path = public
+as $$
+  with items as (
+    select 'post'::text as item_type, p.id, p.id as post_id, p.body, p.category,
+           p.anon_user_id as author_id, u.anon_name as author_name, p.report_count, p.hidden,
+           p.pinned_at, null::int as upvotes, p.created_at
+    from posts p
+    join anon_users u on u.id = p.anon_user_id
+    union all
+    select 'advice', a.id, a.post_id, a.body, null::text,
+           a.anon_user_id, u.anon_name, a.report_count, a.hidden,
+           null::timestamptz, a.upvotes, a.created_at
+    from advices a
+    join anon_users u on u.id = a.anon_user_id
+  ),
+  filtered as (
+    select * from items i
+    where (coalesce(p_kind, 'all') = 'all'
+           or (p_kind = 'posts' and i.item_type = 'post')
+           or (p_kind = 'advices' and i.item_type = 'advice'))
+      and (coalesce(p_q, '') = ''
+           or i.body ilike '%' || p_q || '%'
+           or i.author_name ilike '%' || p_q || '%')
+      and (coalesce(p_category, '') in ('', 'all')
+           or (i.item_type = 'post' and i.category = p_category))
+      and (coalesce(p_status, 'all') = 'all'
+           or (p_status = 'visible' and not i.hidden)
+           or (p_status = 'hidden' and i.hidden)
+           or (p_status = 'flagged' and i.report_count > 0 and not i.hidden))
+      and (not coalesce(p_reported, false) or i.report_count > 0)
+  )
+  select f.item_type, f.id, f.post_id, f.body, f.category, f.author_id, f.author_name,
+         f.report_count, f.hidden, f.pinned_at, f.upvotes, f.created_at,
+         count(*) over () as total_count
+  from filtered f
+  order by f.created_at desc, f.id
+  limit greatest(least(coalesce(p_limit, 25), 100), 1)
+  offset greatest(coalesce(p_offset, 0), 0);
+$$;
+
+-- Everything the dashboard, reports, content and settings cards need, in one round trip.
+-- "week" pairs are [last 7 days, the 7 days before]; "daily" is the last 7 UTC days.
+create or replace function admin_dashboard()
+returns jsonb
+language plpgsql
+stable
+set search_path = public
+as $$
+declare
+  v_totals jsonb;
+  v_week jsonb;
+  v_daily jsonb;
+begin
+  select jsonb_build_object(
+    'posts', (select count(*) from posts),
+    'advices', (select count(*) from advices),
+    'anon_users', (select count(*) from anon_users),
+    'open_reports',
+      (select count(*) from posts where report_count > 0 and not hidden)
+      + (select count(*) from advices where report_count > 0 and not hidden),
+    'urgent_reports',
+      (select count(*) from posts where report_count >= 3 and not hidden)
+      + (select count(*) from advices where report_count >= 3 and not hidden),
+    'hidden_items',
+      (select count(*) from posts where hidden) + (select count(*) from advices where hidden),
+    'banned_devices', (select count(*) from banned_devices),
+    'new_content_24h',
+      (select count(*) from posts where created_at >= now() - interval '24 hours')
+      + (select count(*) from advices where created_at >= now() - interval '24 hours'),
+    'new_reports_24h', (select count(*) from reports where created_at >= now() - interval '24 hours'),
+    'failed_signins_24h',
+      (select count(*) from admin_login_attempts where attempted_at >= now() - interval '24 hours')
+  ) into v_totals;
+
+  select jsonb_build_object(
+    'posts', jsonb_build_array(
+      (select count(*) from posts where created_at >= now() - interval '7 days'),
+      (select count(*) from posts
+         where created_at >= now() - interval '14 days' and created_at < now() - interval '7 days')),
+    'advices', jsonb_build_array(
+      (select count(*) from advices where created_at >= now() - interval '7 days'),
+      (select count(*) from advices
+         where created_at >= now() - interval '14 days' and created_at < now() - interval '7 days')),
+    'anon_users', jsonb_build_array(
+      (select count(*) from anon_users where created_at >= now() - interval '7 days'),
+      (select count(*) from anon_users
+         where created_at >= now() - interval '14 days' and created_at < now() - interval '7 days')),
+    'reports', jsonb_build_array(
+      (select count(*) from reports where created_at >= now() - interval '7 days'),
+      (select count(*) from reports
+         where created_at >= now() - interval '14 days' and created_at < now() - interval '7 days'))
+  ) into v_week;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'day', to_char(g.d, 'YYYY-MM-DD'),
+    'content',
+      (select count(*) from posts p
+         where p.created_at >= g.d and p.created_at < g.d + interval '1 day')
+      + (select count(*) from advices a
+           where a.created_at >= g.d and a.created_at < g.d + interval '1 day'),
+    'users', (select count(*) from anon_users u
+                where u.created_at >= g.d and u.created_at < g.d + interval '1 day'),
+    'reports', (select count(*) from reports r
+                  where r.created_at >= g.d and r.created_at < g.d + interval '1 day')
+  ) order by g.d), '[]'::jsonb)
+  into v_daily
+  from generate_series(
+    date_trunc('day', now()) - interval '6 days',
+    date_trunc('day', now()),
+    interval '1 day'
+  ) as g(d);
+
+  return jsonb_build_object('totals', v_totals, 'week', v_week, 'daily', v_daily);
+end;
+$$;
+
+revoke all on function admin_reports_list(text, text, int, int) from public, anon, authenticated;
+revoke all on function admin_content_list(text, text, text, text, boolean, int, int) from public, anon, authenticated;
+revoke all on function admin_dashboard() from public, anon, authenticated;
+
+grant execute on function admin_reports_list(text, text, int, int) to service_role;
+grant execute on function admin_content_list(text, text, text, text, boolean, int, int) to service_role;
+grant execute on function admin_dashboard() to service_role;
 
 -- Ask PostgREST to pick up the new tables/functions immediately.
 notify pgrst, 'reload schema';
