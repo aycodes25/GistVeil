@@ -31,6 +31,14 @@
   --color-pill: #e5e5e8;          /* neutral count pills ("Showing 4 results") */
   --color-wash: #f7f5ff;          /* faint purple card tint */
   --color-danger: #ed6c6d;
+  --color-success: #3b8429;       /* checked / operational */
+  /* the two tinted notes under the new-post form */
+  --color-note-info: #e0feff;
+  --color-note-info-title: #014245;
+  --color-note-info-text: #006064;
+  --color-note-secure: #fdf3ff;
+  --color-note-secure-title: #551962;
+  --color-note-secure-text: #743483;
   --color-teal: #00a9b3;
   /* pastel backgrounds for generated avatars, chosen per name */
   --color-avatar-1: #e4dcf7;

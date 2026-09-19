@@ -3,7 +3,7 @@ import type { ComponentProps } from 'react';
 import { cn } from '@/lib/cn';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
-export type ButtonSize = 'sm' | 'md' | 'lg';
+export type ButtonSize = 'sm' | 'md' | 'field' | 'lg';
 
 const base =
   'inline-flex shrink-0 items-center justify-center gap-2 font-semibold whitespace-nowrap transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50';
@@ -18,6 +18,7 @@ const variants: Record<ButtonVariant, string> = {
 const sizes: Record<ButtonSize, string> = {
   sm: 'h-8 rounded-lg px-3 text-xs',
   md: 'h-10 rounded-xl px-4 text-sm',
+  field: 'h-11 rounded-xl px-5 text-sm', // the main action of a form (44px)
   lg: 'h-12 rounded-xl px-6 text-sm',
 };
 

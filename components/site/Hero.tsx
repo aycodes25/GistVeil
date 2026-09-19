@@ -50,7 +50,7 @@ export function Hero() {
           <Sparkles aria-hidden className="size-3" />
           Refined Anonymity
         </span>
-        <h2 className="mt-6 font-heading text-4xl leading-[1.1] font-medium text-ink sm:text-5xl">
+        <h2 className="mt-6 font-heading text-4xl leading-[1.1] font-semibold tracking-[-0.01em] text-ink sm:text-5xl">
           A Safe Space for Unfiltered Advice
         </h2>
         <p className="mt-7 max-w-[650px] text-base leading-7 font-medium text-white [text-shadow:0_1px_10px_rgb(60_30_110/0.55)] sm:text-lg sm:leading-[29px]">

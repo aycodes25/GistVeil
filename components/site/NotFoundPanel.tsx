@@ -42,7 +42,7 @@ export function NotFoundPanel({
         <span className="inline-block rounded-full bg-chip px-3 py-1 text-xs font-medium tracking-wide text-primary uppercase">
           {eyebrow}
         </span>
-        <h2 className="mt-4 font-heading text-4xl leading-tight font-semibold tracking-tight text-ink sm:text-5xl">
+        <h2 className="mt-4 font-heading text-4xl leading-tight font-semibold tracking-[-0.01em] text-ink sm:text-5xl">
           Lost in the <span className="text-primary">Veil</span>
         </h2>
         <p className="mt-5 text-base leading-7 text-muted [overflow-wrap:anywhere]">{description}</p>
