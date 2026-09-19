@@ -6,8 +6,7 @@ import { TopBar } from './TopBar';
 import { UserChip } from './UserChip';
 
 // The frame around every public page: sidebar (a drawer below 1024px), top bar, footer. Pages wrap
-// themselves so they can set their own breadcrumbs and title. The light background is applied
-// here, not on <body>, so pages can migrate to the new look one at a time.
+// themselves so they can set their own breadcrumbs and title.
 export function PublicShell({
   crumbs,
   title,
