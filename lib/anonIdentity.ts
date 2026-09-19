@@ -1,7 +1,9 @@
 import { supabase } from './supabaseClient';
 import type { AnonUser } from './types';
 
-const STORAGE_KEY = 'gistveil_identity';
+import { IDENTITY_EVENT, IDENTITY_KEY } from './identityStore';
+
+const STORAGE_KEY = IDENTITY_KEY;
 
 function randomDeviceToken(): string {
   return crypto.randomUUID();
@@ -32,5 +34,6 @@ export async function getOrCreateAnonIdentity(): Promise<AnonUser> {
   }
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.dispatchEvent(new Event(IDENTITY_EVENT)); // let the sidebar chip pick it up
   return data as AnonUser;
 }

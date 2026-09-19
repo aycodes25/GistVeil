@@ -18,7 +18,8 @@
   --color-sunken: #f1f1f4;        /* table header band, inputs */
   --color-border: #dcdce0;        /* sidebar / top-bar rule */
   --color-border-soft: #eaeaee;   /* card outline */
-  --color-divider: #d3d3d8;
+  --color-divider: #d3d3d8;       /* active nav pill, switch track */
+  --color-border-strong: #c9c9cf; /* input borders */
   --color-ink: #1f1f24;
   --color-muted: #71717a;
   --color-primary: #7c3aed;
@@ -29,6 +30,13 @@
   --color-wash: #f7f5ff;          /* faint purple card tint */
   --color-danger: #ed6c6d;
   --color-teal: #00a9b3;
+  /* pastel backgrounds for generated avatars, chosen per name */
+  --color-avatar-1: #e4dcf7;
+  --color-avatar-2: #dbe4fb;
+  --color-avatar-3: #eedff5;
+  --color-avatar-4: #dcecf4;
+  --color-avatar-5: #e9e3f8;
+  --color-avatar-6: #e2e6ff;
   --radius-card: 12px;
   --shadow-card: 0 2px 6px rgb(20 20 40 / 0.06);
 }
