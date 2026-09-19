@@ -2,7 +2,6 @@
 
 import { Check, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { buttonClasses } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 
 // Shares a link to a page of this site. Phones (touch devices) get the system share sheet; on a
@@ -62,10 +61,13 @@ export function ShareButton({
                 copied && 'text-emerald-600',
                 className,
               )
-            : buttonClasses({ variant: 'secondary', size: 'md', className })
+            : cn(
+                'inline-flex h-9 items-center gap-2 rounded-xl border border-border bg-page px-4 text-[13px] font-medium text-ink transition-colors hover:bg-sunken',
+                className,
+              )
         }
       >
-        <Icon aria-hidden className="size-4" />
+        <Icon aria-hidden className={variant === 'icon' ? 'size-4' : 'size-4 text-ink'} />
         {variant === 'button' && (copied ? 'Link copied' : 'Share')}
       </button>
       <span role="status" className="sr-only">

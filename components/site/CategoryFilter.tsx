@@ -18,7 +18,7 @@ export function CategoryFilter({ category, q }: { category?: Category; q: string
   ];
 
   return (
-    <Card raised className="relative z-10 -mt-10 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between sm:px-[17px] sm:py-[15px]">
+    <Card raised id="categories" className="relative z-10 -mt-10 scroll-mt-24 flex flex-col gap-3 rounded-2xl p-3 sm:flex-row sm:items-center sm:justify-between sm:px-[17px] sm:py-[15px]">
       <Tabs items={items} label="Filter posts by category" size="sm" className="min-w-0" />
       {/* Keyed by the phrase so the box follows the URL (for example after "Return Home"). */}
       <SearchInput

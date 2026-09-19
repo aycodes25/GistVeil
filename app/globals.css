@@ -21,6 +21,8 @@
   --color-divider: #d3d3d8;       /* active nav pill, switch track */
   --color-border-strong: #c9c9cf; /* input borders */
   --color-ink: #1f1f24;
+  --color-ink-2: #343439;         /* titles on the post page and reply names */
+  --color-body: #4a4a4f;          /* reading text (a post's body, a reply) */
   --color-muted: #71717a;
   --color-primary: #7c3aed;
   --color-primary-hover: #6d28d9;
@@ -30,6 +32,7 @@
   --color-promise-edge: #e3daf6;  /* its outline */
   --color-pill: #e5e5e8;          /* neutral count pills ("Showing 4 results") */
   --color-wash: #f7f5ff;          /* faint purple card tint */
+  --color-wash-edge: #ded0fb;     /* its outline */
   --color-danger: #ed6c6d;
   --color-success: #3b8429;       /* checked / operational */
   /* the two tinted notes under the new-post form */

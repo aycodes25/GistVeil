@@ -35,7 +35,9 @@ export function PublicShell({
             searchPlaceholder="Search content..."
             right={<UserChip />}
           />
-          <main className="flex-1">{children}</main>
+          {/* overflow-x: clip (not hidden) keeps a wide decorative element from adding a sideways scroll
+              on phones without turning <main> into a scroll container, so the sticky top bar still works. */}
+          <main className="flex-1 overflow-x-clip">{children}</main>
           <footer className="border-t border-border px-4 py-6 text-center text-xs text-muted lg:px-8">
             © {new Date().getFullYear()} GistVeil Anonymous Community. All rights reserved.
           </footer>
