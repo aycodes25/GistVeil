@@ -1,95 +1,33 @@
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabaseClient';
-import { getOrCreateAnonIdentity } from '@/lib/anonIdentity';
-import { checkSafety } from '@/lib/safetyFilter';
-import { fetchBlockedWords } from '@/lib/blockedWords';
-import { CATEGORIES } from '@/lib/categories';
-import type { Category } from '@/lib/types';
+import { Sparkles } from 'lucide-react';
+import { PublicShell } from '@/components/shell/PublicShell';
+import { ComposeAside, ComposeNotes } from '@/components/site/ComposePanels';
+import { PostForm } from '@/components/site/PostForm';
 
 export default function NewPostPage() {
-  const router = useRouter();
-  const [body, setBody] = useState('');
-  const [category, setCategory] = useState<Category | ''>('');
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-
-    if (!body.trim()) {
-      setError('Write something before posting.');
-      return;
-    }
-    if (!category) {
-      setError('Pick a category.');
-      return;
-    }
-
-    // Submitting is set before the first await so a double-click can't submit twice while
-    // the blocked-words list loads.
-    setSubmitting(true);
-    try {
-      const safety = checkSafety(body, await fetchBlockedWords());
-      if (!safety.ok) {
-        setError(safety.reason ?? 'This post cannot be published.');
-        return;
-      }
-
-      const identity = await getOrCreateAnonIdentity();
-      const { data, error: insertError } = await supabase
-        .from('posts')
-        .insert({ anon_user_id: identity.id, category, body: body.trim() })
-        .select('id')
-        .single();
-
-      if (insertError || !data) {
-        throw insertError ?? new Error('Insert failed');
-      }
-
-      router.push(`/post/${data.id}`);
-    } catch {
-      setError("Couldn't post right now. Try again.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <main className="mx-auto max-w-xl px-4 py-6">
-      <h1 className="mb-4 text-xl font-bold text-white">Create Post</h1>
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="What's on your mind? Be anonymous..."
-          rows={6}
-          className="rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-neutral-100"
-        />
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as Category)}
-          className="rounded-lg border border-neutral-800 bg-neutral-900 p-3 text-neutral-100"
-        >
-          <option value="">Pick a category</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        {error && <p className="text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-full bg-purple-600 px-4 py-2 font-medium text-white disabled:opacity-50"
-        >
-          {submitting ? 'Posting…' : 'Post Anonymously'}
-        </button>
-      </form>
-    </main>
+    <PublicShell crumbs={[{ label: 'Home', href: '/' }, { label: 'New Post' }]} title="Compose Advice Request">
+      <div className="mx-auto w-full max-w-[1152px] px-4 pt-10 pb-16 sm:px-6">
+        <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_342px]">
+          <div>
+            <header>
+              <p className="flex items-center gap-2 text-xs font-medium tracking-[0.05em] text-primary uppercase">
+                <Sparkles aria-hidden className="size-[18px]" />
+                New Anonymous Post
+              </p>
+              <h2 className="mt-2 font-heading text-4xl leading-9 font-semibold tracking-[-0.01em] text-ink">
+                Share your thoughts calmly.
+              </h2>
+              <p className="mt-3 max-w-[690px] text-base leading-relaxed text-muted">
+                Your identity remains hidden. Describe your situation clearly to receive the most helpful advice
+                from our community.
+              </p>
+            </header>
+            <PostForm />
+            <ComposeNotes />
+          </div>
+          <ComposeAside />
+        </div>
+      </div>
+    </PublicShell>
   );
 }

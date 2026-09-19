@@ -2,10 +2,12 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ANNOUNCEMENT_MAX,
+  BANNER_TITLE_MAX,
   WORD_MAX,
   escapeLike,
   isTargetType,
   isUuid,
+  normalizeBanner,
   normalizeAnnouncement,
   parsePage,
   parseWordList,
@@ -106,5 +108,38 @@ describe('pickOne', () => {
     assert.equal(pickOne('b', ['a', 'b'] as const, 'a'), 'b');
     assert.equal(pickOne('bogus', ['a', 'b'] as const, 'a'), 'a');
     assert.equal(pickOne(undefined, ['a', 'b'] as const, 'a'), 'a');
+  });
+});
+
+describe('normalizeBanner', () => {
+  const base = { message: 'Hello', title: 'Notice', theme: 'info', active: 'true' };
+
+  test('accepts a complete banner and trims it', () => {
+    assert.deepEqual(normalizeBanner({ ...base, message: '  Hello  ', title: ' Notice ' }), {
+      ok: true,
+      value: { message: 'Hello', title: 'Notice', theme: 'info', active: true },
+    });
+  });
+
+  test('only the exact value "true" switches it on', () => {
+    for (const active of ['false', '', 'on', '1']) {
+      const result = normalizeBanner({ ...base, active });
+      assert.equal(result.ok && result.value.active, false, `active=${JSON.stringify(active)}`);
+    }
+  });
+
+  test('an unknown theme is refused', () => {
+    assert.deepEqual(normalizeBanner({ ...base, theme: 'neon' }), { ok: false, error: 'Pick a theme.' });
+  });
+
+  test('a too-long message or title is refused', () => {
+    assert.equal(normalizeBanner({ ...base, message: 'x'.repeat(ANNOUNCEMENT_MAX + 1) }).ok, false);
+    assert.equal(normalizeBanner({ ...base, title: 'x'.repeat(BANNER_TITLE_MAX + 1) }).ok, false);
+    assert.equal(normalizeBanner({ ...base, message: 'x'.repeat(ANNOUNCEMENT_MAX) }).ok, true);
+  });
+
+  test('an empty message is valid: it means remove the banner', () => {
+    const result = normalizeBanner({ ...base, message: '   ' });
+    assert.equal(result.ok && result.value.message, '');
   });
 });

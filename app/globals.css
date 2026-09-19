@@ -1,38 +1,89 @@
 @import "tailwindcss";
 
-/* The whole UI is designed dark-only (black page, neutral-900 cards, white headings). The
-   scaffold's light/dark switch put a WHITE body behind those white headings for visitors whose
-   browser is in light mode, and its unlayered `body` rule beat Tailwind's layered `bg-black`. */
+/* The UI is light-only, whatever the visitor's browser prefers. These colour the <body> behind the
+   shells (visible when a page is short or on overscroll); they match --color-page and --color-ink. */
 :root {
-  --background: #000000;
-  --foreground: #ededed;
-  color-scheme: dark; /* dark scrollbars and native controls (select, checkbox) too */
+  --background: #f6f6f9;
+  --foreground: #1f1f24;
+  color-scheme: light; /* light scrollbars and native controls (select, checkbox) too */
 }
 
+/* ---- Design tokens (measured from the Visily mockups) ---------------------------------------- */
+@theme {
+  --color-page: #f6f6f9;          /* page, top bar, and card fill: cards are page-coloured */
+  --color-sidebar: #e5e5e8;
+  --color-sunken: #f1f1f4;        /* table header band, inputs */
+  --color-border: #dcdce0;        /* sidebar / top-bar rule */
+  --color-border-soft: #eaeaee;   /* hairlines inside cards (table rows, footers) */
+  --color-divider: #d3d3d8;       /* active nav pill, switch track */
+  --color-border-strong: #c9c9cf; /* input borders */
+  --color-ink: #1f1f24;
+  --color-ink-2: #343439;         /* titles on the post page and reply names */
+  --color-body: #4a4a4f;          /* reading text (a post's body, a reply) */
+  --color-muted: #71717a;
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-soft: #efecf8;  /* soft purple surface */
+  --color-chip: #eae3f7;          /* icon chips */
+  --color-promise: #e9e3f8;       /* "GistVeil Promise" card */
+  --color-promise-edge: #e3daf6;  /* its outline */
+  --color-pill: #e5e5e8;          /* neutral count pills ("Showing 4 results") */
+  --color-wash: #f7f5ff;          /* faint purple card tint */
+  --color-wash-edge: #ded0fb;     /* its outline */
+  --color-danger: #ed6c6d;
+  --color-success: #3b8429;       /* checked / operational */
+  /* the admin sign-in screen: a grey backdrop and a frosted card, as in its mockup */
+  --color-login-page: #757579;
+  --color-login-card: #a9a9ac;
+  --color-login-field: #cfcfd3;
+  --color-login-note: #bbbbbe;
+  /* the two tinted notes under the new-post form */
+  --color-note-info: #e0feff;
+  --color-note-info-title: #014245;
+  --color-note-info-text: #006064;
+  --color-note-secure: #fdf3ff;
+  --color-note-secure-title: #551962;
+  --color-note-secure-text: #743483;
+  --color-teal: #00a9b3;
+  /* pastel backgrounds for generated avatars, chosen per name */
+  --color-avatar-1: #e4dcf7;
+  --color-avatar-2: #dbe4fb;
+  --color-avatar-3: #eedff5;
+  --color-avatar-4: #dcecf4;
+  --color-avatar-5: #e9e3f8;
+  --color-avatar-6: #e2e6ff;
+  --radius-card: 12px;
+  /* Fitted to the mockups' pixels: a card is outlined by --color-divider and lifted by a tight
+     shadow; the feed's filter bar is "raised", a wide shadow that falls mostly below it. */
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.17);
+  --shadow-raised: 0 6px 24px -12px rgb(0 0 0 / 0.5);
+}
+
+/* Fonts are provided by next/font as CSS variables on <html>: Outfit for headings and large
+   numbers, Plus Jakarta Sans for body and interface text. */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-outfit), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* No font-family here: the theme's font-sans (Plus Jakarta Sans) is Tailwind's default. */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Dashboard charts. The admin UI is dark-only, so there is a single set of tokens. The three
-   series colours were validated with the dataviz palette validator against the #171717 card
-   surface (worst adjacent colour-blind separation dE 9.4, normal-vision 26.5, all >= 3:1). */
+/* Dashboard charts (light). The three series colours are the mockup's purple, teal and red, checked
+   with the dataviz palette validator against the page surface #f6f6f9: lightness band, chroma and
+   colour-blind separation (worst adjacent dE 11.7) all pass. The one warning, teal and red under 3:1
+   against the surface, is what the chart's legend, tooltip and "View as table" are there to cover. */
 .viz-root {
-  --viz-surface: #171717;
-  --viz-ink: #f5f5f5;
-  --viz-ink-secondary: #c3c2b7;
-  --viz-ink-muted: #898781;
-  --viz-grid: #2c2c2a;
-  --viz-axis: #383835;
-  --viz-series-1: #3987e5;
-  --viz-series-2: #d95926;
-  --viz-series-3: #199e70;
+  --viz-surface: #f6f6f9;
+  --viz-ink: #1f1f24;
+  --viz-ink-secondary: #4a4a4f;
+  --viz-ink-muted: #71717a;
+  --viz-grid: #d9d9de;
+  --viz-axis: #c9c9cf;
+  --viz-series-1: #7c3aed;
+  --viz-series-2: #00a9b3;
+  --viz-series-3: #ed6c6d;
 }

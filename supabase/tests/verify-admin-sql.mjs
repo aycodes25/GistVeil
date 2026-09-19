@@ -306,5 +306,134 @@ record(
   'admin_bans post/advice counts match the tables',
 );
 
+// --- redesign additions ---------------------------------------------------------------------
+console.log('\n[redesign: banner settings policy, popular_categories, list functions, dashboard]');
+
+// settings: exactly the four announcement keys are public
+await q(`insert into settings (key, value) values
+  ('announcement_title','Notice'),('announcement_theme','warning'),('announcement_active','true'),('secret_setting','x')
+  on conflict (key) do update set value = excluded.value`);
+const publicKeys = (await as('anon', () => q('select key from settings order by key'))).map((r) => r.key);
+record(
+  JSON.stringify(publicKeys) === JSON.stringify(['announcement', 'announcement_active', 'announcement_theme', 'announcement_title']),
+  'anon reads exactly the four announcement keys and no other setting',
+  JSON.stringify(publicKeys),
+);
+
+// grants
+for (const call of [
+  `select * from admin_reports_list()`,
+  `select * from admin_content_list()`,
+  `select admin_dashboard()`,
+]) {
+  for (const role of ['anon', 'authenticated']) {
+    await expectError(role, call, /permission denied for function/, `${role} cannot run ${call.slice(7, call.indexOf('(', 7))}`);
+  }
+  await expectOk('service_role', call, `service_role can run ${call.slice(7, call.indexOf('(', 7))}`);
+}
+await expectOk('anon', `select * from popular_categories(7)`, 'anon can run popular_categories');
+
+// popular_categories: visible posts in the window only, RLS applies (hidden posts never counted)
+const RA = '00000000-0000-0000-0000-0000000000a1';
+const RB = '00000000-0000-0000-0000-0000000000a2';
+const RC = '00000000-0000-0000-0000-0000000000a3'; // owns the popular_categories fixtures so the RDX-scoped list checks below never see them
+await q(`insert into anon_users (id, anon_name, device_token) values ($1,'Anon #RDXA','rdx-token-a'),($2,'Anon #RDXB','rdx-token-b'),($3,'Anon #PCXC','pcx-token-c')`, [RA, RB, RC]);
+await q(`insert into posts (anon_user_id, category, body, created_at) values ($1,'education','PCX-too-old', now() - interval '10 days')`, [RC]);
+await q(`insert into posts (anon_user_id, category, body, hidden) values ($1,'family','PCX-hidden-family', true)`, [RC]);
+const expectedPopular = (await q(`select category, count(*)::int n from posts where not hidden and created_at >= now() - interval '7 days' group by 1 order by n desc, category limit 6`)).map((r) => `${r.category}:${r.n}`);
+const gotPopular = (await as('anon', () => q(`select category, n::int n from popular_categories(7)`))).map((r) => `${r.category}:${r.n}`);
+record(JSON.stringify(gotPopular) === JSON.stringify(expectedPopular), 'popular_categories = visible posts in the window, most active first', JSON.stringify(gotPopular));
+const oneDay = await as('anon', () => q(`select category, n::int n from popular_categories(0)`));
+record(Array.isArray(oneDay), 'popular_categories(0) clamps to one day instead of erroring');
+
+// fixtures for the list functions
+const one1 = async (sql, params) => (await q(sql, params))[0].id;
+const rp = await one1(`insert into posts (anon_user_id, category, body) values ($1,'work','RDX post with three reports') returning id`, [RA]);
+const rq = await one1(`insert into posts (anon_user_id, category, body) values ($1,'money','RDX post with one report') returning id`, [RB]);
+const rh = await one1(`insert into posts (anon_user_id, category, body) values ($1,'work','RDX hidden reported post') returning id`, [RB]);
+const rplain = await one1(`insert into posts (anon_user_id, category, body) values ($1,'work','RDX plain post') returning id`, [RA]);
+await one1(`insert into posts (anon_user_id, category, body, hidden) values ($1,'money','RDX hidden plain post', true) returning id`, [RB]);
+const ra = await one1(`insert into advices (post_id, anon_user_id, body) values ($1,$2,'RDX advice with two reports') returning id`, [rp, RB]);
+await as('anon', async () => {
+  for (const t of ['r-1', 'r-2', 'r-3']) await q(`select increment_report('post', '${rp}', '${t}')`);
+  for (const t of ['r-1', 'r-2']) await q(`select increment_report('advice', '${ra}', '${t}')`);
+  await q(`select increment_report('post', '${rq}', 'r-1')`);
+  for (const t of ['r-1', 'r-2', 'r-3', 'r-4']) await q(`select increment_report('post', '${rh}', '${t}')`);
+});
+await q(`update posts set hidden = true where id = $1`, [rh]);
+
+const svc = (sql, params) => as('service_role', () => q(sql, params));
+
+// admin_reports_list
+const rl = await svc(`select * from admin_reports_list(null, 'RDX')`);
+record(
+  JSON.stringify(rl.map((r) => `${r.item_type}:${r.report_count}`)) === JSON.stringify(['post:3', 'advice:2', 'post:1']),
+  'reports list: most-reported first, posts and advice together, hidden items excluded',
+  JSON.stringify(rl.map((r) => `${r.item_type}:${r.report_count}`)),
+);
+record(rl.every((r) => Number(r.total_count) === 3), 'reports list: total_count is the full count on every row');
+record(rl.every((r) => r.latest_report_at !== null), 'reports list: each item carries the time of its latest report');
+const onlyAdvice = await svc(`select * from admin_reports_list('advice', 'RDX')`);
+record(onlyAdvice.length === 1 && onlyAdvice[0].item_type === 'advice', 'reports list: type filter');
+const byAuthor = await svc(`select * from admin_reports_list(null, 'RDXB')`);
+record(byAuthor.length === 2, 'reports list: search matches the author name', String(byAuthor.length));
+const page2 = await svc(`select * from admin_reports_list(null, 'RDX', 1, 1)`);
+record(page2.length === 1 && page2[0].item_type === 'advice' && Number(page2[0].total_count) === 3, 'reports list: paging keeps the total');
+const clamped = await svc(`select * from admin_reports_list(null, 'RDX', 100000, 0)`);
+record(clamped.length === 3, 'reports list: a huge limit is clamped, not an error');
+const literalPercent = await svc(`select * from admin_reports_list(null, '\\%')`);
+record(literalPercent.length === 0, 'reports list: an escaped % matches literally');
+
+// admin_content_list
+const cl = (args) => svc(`select * from admin_content_list(${args})`);
+const all = await cl(`'all', 'RDX'`);
+record(all.length === 6 && Number(all[0].total_count) === 6, 'content list: all = posts and advice together', String(all.length));
+record((await cl(`'posts', 'RDX'`)).length === 5, 'content list: posts only');
+record((await cl(`'advices', 'RDX'`)).length === 1, 'content list: advice only');
+record((await cl(`'all', 'RDX', null, 'visible'`)).length === 4, 'content list: status visible excludes hidden items');
+record((await cl(`'all', 'RDX', null, 'hidden'`)).length === 2, 'content list: status hidden');
+record((await cl(`'all', 'RDX', null, 'flagged'`)).length === 3, 'content list: status flagged = reported and not hidden');
+record((await cl(`'all', 'RDX', null, 'all', true`)).length === 4, 'content list: reported-only');
+record((await cl(`'all', 'RDX', 'work'`)).length === 3, 'content list: a category filter applies to posts and leaves replies out', String((await cl(`'all', 'RDX', 'work'`)).length));
+record((await cl(`'all', 'RDX-nothing'`)).length === 0, 'content list: no match gives no rows');
+// RDXA wrote two of the fixtures (rp, rplain); RDXB wrote the other four (rq, rh, the hidden plain post, and the advice)
+const byRdxA = await cl(`'all', 'RDXA'`);
+const byRdxB = await cl(`'all', 'RDXB'`);
+record(byRdxA.length === 2 && byRdxB.length === 4, 'content list: search matches the author name', `${byRdxA.length}/${byRdxB.length}`);
+const times = all.map((r) => new Date(r.created_at).getTime());
+record(times.every((t, i) => i === 0 || times[i - 1] >= t), 'content list: newest first');
+const pageOne = await cl(`'all', 'RDX', null, 'all', false, 2, 4`);
+record(pageOne.length === 2 && Number(pageOne[0].total_count) === 6, 'content list: paging keeps the total');
+const advRow = all.find((r) => r.item_type === 'advice');
+record(advRow && advRow.upvotes === 0 && advRow.category === null && advRow.pinned_at === null, 'content list: replies have upvotes and no category/pin');
+await q(`update posts set pinned_at = now() where id = $1`, [rplain]);
+record((await cl(`'posts', 'RDX plain'`))[0].pinned_at !== null, 'content list: posts carry pinned_at');
+
+// admin_dashboard
+await q(`insert into posts (anon_user_id, category, body, created_at) values ($1,'money','RDX-3d-a', now() - interval '3 days'),($1,'money','RDX-3d-b', now() - interval '3 days'),($1,'work','RDX-10d-a', now() - interval '10 days'),($1,'work','RDX-10d-b', now() - interval '10 days'),($1,'work','RDX-10d-c', now() - interval '10 days')`, [RA]);
+await q(`insert into admin_login_attempts (ip, attempted_at) values ('1.1.1.1', now() - interval '2 hours'),('2.2.2.2', now() - interval '1 hour'),('3.3.3.3', now() - interval '30 hours')`);
+const dash = parse((await svc(`select admin_dashboard() as d`))[0].d);
+const direct = async (sql) => Number((await q(sql))[0].n);
+const totals = dash.totals;
+record(totals.posts === (await direct(`select count(*) n from posts`)), 'dashboard: totals.posts matches the table');
+record(totals.advices === (await direct(`select count(*) n from advices`)), 'dashboard: totals.advices matches the table');
+record(totals.anon_users === (await direct(`select count(*) n from anon_users`)), 'dashboard: totals.anon_users matches the table');
+record(totals.hidden_items === (await direct(`select (select count(*) from posts where hidden)+(select count(*) from advices where hidden) n`)), 'dashboard: hidden_items counts posts and advice');
+record(totals.open_reports === (await direct(`select (select count(*) from posts where report_count>0 and not hidden)+(select count(*) from advices where report_count>0 and not hidden) n`)), 'dashboard: open_reports excludes hidden');
+record(totals.urgent_reports === (await direct(`select (select count(*) from posts where report_count>=3 and not hidden)+(select count(*) from advices where report_count>=3 and not hidden) n`)), 'dashboard: urgent_reports = 3 or more reports, not hidden');
+record(totals.urgent_reports >= 1, 'dashboard: the 3-report fixture is urgent', String(totals.urgent_reports));
+record(totals.new_content_24h === (await direct(`select (select count(*) from posts where created_at >= now()-interval '24 hours')+(select count(*) from advices where created_at >= now()-interval '24 hours') n`)), 'dashboard: new_content_24h');
+record(totals.new_reports_24h === (await direct(`select count(*) n from reports where created_at >= now()-interval '24 hours'`)), 'dashboard: new_reports_24h');
+record(totals.failed_signins_24h === (await direct(`select count(*) n from admin_login_attempts where attempted_at >= now()-interval '24 hours'`)) && totals.failed_signins_24h >= 2, 'dashboard: failed sign-ins counts the last 24 hours only', String(totals.failed_signins_24h));
+const cur = await direct(`select count(*) n from posts where created_at >= now()-interval '7 days'`);
+const prev = await direct(`select count(*) n from posts where created_at >= now()-interval '14 days' and created_at < now()-interval '7 days'`);
+record(JSON.stringify(dash.week.posts) === JSON.stringify([cur, prev]) && prev >= 3, 'dashboard: week.posts = [last 7 days, the 7 before]', JSON.stringify(dash.week.posts));
+const repCur = await direct(`select count(*) n from reports where created_at >= now()-interval '7 days'`);
+record(dash.week.reports[0] === repCur, 'dashboard: week.reports counts report rows');
+record(dash.daily.length === 7 && dash.daily.at(-1).day === (await q(`select to_char(now(), 'YYYY-MM-DD') d`))[0].d, 'dashboard: daily has 7 entries ending today');
+const windowContent = await direct(`select (select count(*) from posts where created_at >= date_trunc('day', now())-interval '6 days')+(select count(*) from advices where created_at >= date_trunc('day', now())-interval '6 days') n`);
+record(dash.daily.reduce((s, d) => s + d.content, 0) === windowContent, 'dashboard: daily content sums to the 7-day total');
+
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

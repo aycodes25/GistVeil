@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache';
 import { getAdminClient } from '@/lib/admin/client';
 import type { ActionResult, SettingsFormState } from '@/lib/admin/types';
-import { WORD_MAX, normalizeAnnouncement, parseWordList } from '@/lib/admin/validate';
+import { ANNOUNCEMENT_KEYS } from '@/lib/announcement';
+import { WORD_MAX, normalizeBanner, parseWordList } from '@/lib/admin/validate';
 
 // Same rules as the moderation actions: authenticate first (getAdminClient), then validate,
 // then write; detail goes to the server log and the browser gets a generic message.
@@ -23,33 +24,53 @@ function failed(context: string, error: unknown): SettingsFormState {
   return { error: FAILED };
 }
 
-export async function saveAnnouncement(
+// Saves the whole banner: text, title, colour theme and the on/off switch (four settings rows).
+// An empty message removes the banner altogether.
+export async function saveBanner(
   _previous: SettingsFormState,
   formData: FormData,
 ): Promise<SettingsFormState> {
   const db = await getAdminClient();
 
-  const raw = formData.get('announcement');
-  if (typeof raw !== 'string') return { error: 'Invalid request.' };
+  const field = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === 'string' ? value : null;
+  };
+  const message = field('message');
+  const title = field('title');
+  const theme = field('theme');
+  const active = field('active');
+  if (message === null || title === null || theme === null || active === null) {
+    return { error: 'Invalid request.' };
+  }
 
-  const result = normalizeAnnouncement(raw);
+  const result = normalizeBanner({ message, title, theme, active });
   if (!result.ok) return { error: result.error };
+  const banner = result.value;
 
-  // An empty announcement means "remove the banner".
-  const { error } =
-    result.value === ''
-      ? await db.from('settings').delete().eq('key', 'announcement')
-      : await db
-          .from('settings')
-          .upsert(
-            { key: 'announcement', value: result.value, updated_at: new Date().toISOString() },
-            { onConflict: 'key' },
-          );
-  if (error) return failed('save announcement', error);
+  if (banner.message === '') {
+    const { error } = await db.from('settings').delete().in('key', [...ANNOUNCEMENT_KEYS]);
+    if (error) return failed('remove banner', error);
+    revalidatePath('/admin', 'layout');
+    revalidatePath('/');
+    return { ok: true, message: 'Banner removed.' };
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await db.from('settings').upsert(
+    [
+      { key: 'announcement', value: banner.message, updated_at: now },
+      { key: 'announcement_title', value: banner.title, updated_at: now },
+      { key: 'announcement_theme', value: banner.theme, updated_at: now },
+      { key: 'announcement_active', value: banner.active ? 'true' : 'false', updated_at: now },
+    ],
+    { onConflict: 'key' },
+  );
+  if (error) return failed('save banner', error);
 
   revalidatePath('/admin', 'layout');
   revalidatePath('/');
-  return { ok: true, message: result.value === '' ? 'Announcement removed.' : 'Announcement saved.' };
+  return { ok: true, message: banner.active ? 'Banner saved and live.' : 'Banner saved (switched off).' };
 }
 
 export async function addBlockedWords(

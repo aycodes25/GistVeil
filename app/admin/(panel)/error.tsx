@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
+import { AdminShell } from '@/components/shell/AdminShell';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 
 export default function PanelError({
   error,
@@ -14,20 +17,20 @@ export default function PanelError({
   }, [error]);
 
   return (
-    <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-      <h2 className="mb-1 text-lg font-semibold text-white">Something went wrong</h2>
-      <p className="mb-3 text-sm text-neutral-400">
-        This page couldn&apos;t load. Check the server logs
-        {error.digest ? ` (reference ${error.digest})` : ''} — the usual causes are a missing
-        service-role key in the server&apos;s environment, or supabase/admin.sql not having been run.
-      </p>
-      <button
-        type="button"
-        onClick={() => retry()}
-        className="rounded-full bg-purple-600 px-4 py-2 text-sm font-medium text-white"
-      >
-        Try again
-      </button>
-    </div>
+    <AdminShell crumbs={[{ label: 'Admin', href: '/admin' }, { label: 'Error' }]} title="Something went wrong">
+      <div className="mx-auto max-w-2xl px-4 py-10 sm:px-8">
+        <Card className="p-6">
+          <h2 className="font-heading text-xl font-semibold text-ink">Something went wrong</h2>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            This page couldn&apos;t load. Check the server logs
+            {error.digest ? ` (reference ${error.digest})` : ''}. The usual causes are a missing service-role key in
+            the server&apos;s environment, or supabase/admin.sql not having been run.
+          </p>
+          <Button className="mt-5" onClick={() => retry()}>
+            Try again
+          </Button>
+        </Card>
+      </div>
+    </AdminShell>
   );
 }
