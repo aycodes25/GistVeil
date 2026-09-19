@@ -17,7 +17,7 @@ export function SearchInput({
   defaultValue?: string;
   placeholder: string;
   hidden?: Record<string, string>;
-  size?: 'md' | 'lg';
+  size?: 'md' | 'lg' | 'xl';
   className?: string;
 }) {
   return (
@@ -34,7 +34,9 @@ export function SearchInput({
         aria-label={placeholder}
         className={cn(
           'w-full border border-border-strong bg-page pr-4 pl-10 text-sm text-ink placeholder:text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none',
-          size === 'md' ? 'h-9 rounded-full' : 'h-10 rounded-xl',
+          size === 'md' && 'h-9 rounded-full',
+          size === 'lg' && 'h-10 rounded-xl',
+          size === 'xl' && 'h-12 rounded-xl',
         )}
       />
       {Object.entries(hidden ?? {}).map(([key, value]) => (

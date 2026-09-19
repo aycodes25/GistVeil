@@ -18,10 +18,9 @@ export function isTargetType(value: unknown): value is TargetType {
   return value === 'post' || value === 'advice';
 }
 
-// Escapes the LIKE metacharacters so user search text matches literally.
-export function escapeLike(input: string): string {
-  return input.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
+// Escapes the LIKE metacharacters so user search text matches literally. Shared with the public
+// feed's search, so it lives outside the admin folder.
+export { escapeLike } from '../like';
 
 // Blocked-word input: comma- or newline-separated; entries are trimmed, lowercased and
 // de-duplicated. Entries over WORD_MAX come back in `rejected` so the caller can say so.

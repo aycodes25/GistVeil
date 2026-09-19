@@ -15,13 +15,15 @@ const tones: Record<BadgeTone, string> = {
 export function Badge({
   tone = 'neutral',
   shape = 'pill',
+  size = 'sm',
   className,
   ...props
-}: ComponentProps<'span'> & { tone?: BadgeTone; shape?: 'pill' | 'square' }) {
+}: ComponentProps<'span'> & { tone?: BadgeTone; shape?: 'pill' | 'square'; size?: 'xs' | 'sm' }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 px-2 py-0.5 text-[11px] leading-4 font-semibold whitespace-nowrap',
+        'inline-flex items-center gap-1 px-2 leading-4 font-semibold whitespace-nowrap',
+        size === 'sm' ? 'py-0.5 text-[11px]' : 'text-[10px]',
         shape === 'pill' ? 'rounded-full' : 'rounded-md',
         tones[tone],
         className,

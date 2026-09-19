@@ -1,76 +1,96 @@
+import { PublicShell } from '@/components/shell/PublicShell';
+import { AnnouncementBanner } from '@/components/site/AnnouncementBanner';
+import { CategoryFilter } from '@/components/site/CategoryFilter';
+import { FeedList } from '@/components/site/FeedList';
+import { Hero } from '@/components/site/Hero';
+import { NotFoundPanel } from '@/components/site/NotFoundPanel';
+import { SidePanels } from '@/components/site/SidePanels';
+import type { TrendingItem } from '@/components/site/SidePanels';
+import { Card } from '@/components/ui/Card';
+import { ANNOUNCEMENT_KEYS, visibleBanner } from '@/lib/announcement';
+import { categoryLabel } from '@/lib/categories';
+import { parseCategory, parseSearch, toFeedPosts } from '@/lib/feed';
+import { fetchFeedPage } from '@/lib/feedQuery';
 import { supabase } from '@/lib/supabaseClient';
-import { PostCard } from '@/components/PostCard';
-import { CategoryTabs } from '@/components/CategoryTabs';
-import type { Category, Post } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
+
+const TRENDING_DAYS = 7;
+const TRENDING_SHOWN = 4;
 
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string | string[]; q?: string | string[] }>;
 }) {
-  const { category } = await searchParams;
-  const activeCategory = category as Category | undefined;
+  const params = await searchParams;
+  const category = parseCategory(params.category);
+  const q = parseSearch(params.q);
 
-  // Pinned posts first, then newest. If the admin migration (supabase/admin.sql) hasn't been
-  // run yet, `pinned_at` doesn't exist and PostgREST answers 42703 (undefined column): fall
-  // back to plain newest-first so an un-migrated database never blanks the public feed.
-  function feedQuery(withPins: boolean) {
-    let query = supabase.from('posts').select('*, anon_users(anon_name), advices(count)');
-    if (withPins) query = query.order('pinned_at', { ascending: false, nullsFirst: false });
-    query = query.order('created_at', { ascending: false }).limit(30);
-    if (activeCategory) query = query.eq('category', activeCategory);
-    return query;
-  }
-
-  const [feed, announcementResult] = await Promise.all([
-    feedQuery(true),
-    // Errors are ignored on purpose: no settings table (or no row) simply means no banner.
-    supabase.from('settings').select('value').eq('key', 'announcement').maybeSingle(),
+  const [feed, settings, popular] = await Promise.all([
+    fetchFeedPage(supabase, { category, q }),
+    supabase.from('settings').select('key, value').in('key', [...ANNOUNCEMENT_KEYS]),
+    supabase.rpc('popular_categories', { p_days: TRENDING_DAYS }),
   ]);
-  let { data, error } = feed;
-  if (error?.code === '42703') {
-    ({ data, error } = await feedQuery(false));
-  }
-  const announcement = announcementResult.data?.value?.trim();
 
-  const posts: Post[] = (data ?? []).map((p: any) => ({
-    ...p,
-    advice_count: p.advices?.[0]?.count ?? 0,
-  }));
+  // A search with no matches shows the "Lost in the Veil" panel, and the latest posts (in the
+  // same category) below it so the visitor is never left at a dead end.
+  const noMatches = q !== '' && !feed.error && feed.total === 0;
+  const list = noMatches ? await fetchFeedPage(supabase, { category }) : feed;
+
+  // Errors are ignored on purpose for both: no settings table or no RPC (an un-migrated database)
+  // simply means no banner and no Trending Topics card.
+  const banner = settings.error ? null : visibleBanner(settings.data ?? []);
+  const trending: TrendingItem[] | null = popular.error
+    ? null
+    : (popular.data ?? [])
+        .flatMap((row: { category: string; n: number | string }) => {
+          const known = parseCategory(row.category);
+          return known ? [{ category: known, count: Number(row.n) }] : [];
+        })
+        .slice(0, TRENDING_SHOWN);
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-white">GistVeil</h1>
-        <a
-          href="/post/new"
-          className="rounded-full bg-purple-600 px-4 py-2 text-sm font-medium text-white"
-        >
-          Post
-        </a>
-      </div>
-      {announcement && (
-        <div
-          role="note"
-          className="mb-4 rounded-lg border border-purple-800 bg-purple-950/50 px-4 py-3 text-sm whitespace-pre-wrap text-purple-100"
-        >
-          {announcement}
+    <PublicShell crumbs={[{ label: 'GistVeil', href: '/' }, { label: 'Community Feed' }]} title="Discover Advice">
+      {banner && (
+        <div className="px-4 pt-4 sm:px-6">
+          <div className="mx-auto max-w-[1088px]">
+            <AnnouncementBanner title={banner.title} message={banner.message} theme={banner.theme} />
+          </div>
         </div>
       )}
-      <CategoryTabs active={activeCategory ?? 'all'} />
-      {error && (
-        <p className="mt-4 text-red-400">Couldn&apos;t load the feed. Try refreshing.</p>
-      )}
-      <div className="mt-4 flex flex-col gap-3">
-        {posts.length === 0 && !error && (
-          <p className="text-neutral-400">No posts yet. Be the first.</p>
+
+      <Hero />
+
+      <div className="mx-auto w-full max-w-[1136px] px-4 pb-11 sm:px-6">
+        <CategoryFilter category={category} q={q} />
+
+        {noMatches && (
+          <NotFoundPanel
+            eyebrow="No results"
+            description={`No posts${category ? ` in ${categoryLabel(category)}` : ''} match “${q}”. Try different words, or browse the latest posts below.`}
+            searchDefault={q}
+            secondary={{ label: 'Load more posts', href: '#latest' }}
+          />
         )}
-        {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
-        ))}
+
+        <div className="mt-12 grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
+          {list.error ? (
+            <Card className="h-fit px-6 py-10 text-center text-muted">
+              Couldn&apos;t load the feed. Try refreshing.
+            </Card>
+          ) : (
+            <FeedList
+              key={`${category ?? 'all'}|${noMatches ? '' : q}`}
+              initialPosts={toFeedPosts(list.rows)}
+              initialTotal={list.total}
+              category={category}
+              q={noMatches ? '' : q}
+            />
+          )}
+          <SidePanels trending={trending} />
+        </div>
       </div>
-    </main>
+    </PublicShell>
   );
 }
