@@ -35,6 +35,11 @@
   --color-wash-edge: #ded0fb;     /* its outline */
   --color-danger: #ed6c6d;
   --color-success: #3b8429;       /* checked / operational */
+  /* the admin sign-in screen: a grey backdrop and a frosted card, as in its mockup */
+  --color-login-page: #757579;
+  --color-login-card: #a9a9ac;
+  --color-login-field: #cfcfd3;
+  --color-login-note: #bbbbbe;
   /* the two tinted notes under the new-post form */
   --color-note-info: #e0feff;
   --color-note-info-title: #014245;
